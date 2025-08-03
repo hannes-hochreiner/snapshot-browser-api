@@ -1,0 +1,12 @@
+{
+  "snapshot_roots": {
+    "root1": {
+      "path": "./test_data",
+      "suffix": "some_suffix"
+    },
+    "root2": {
+      "path": "/snapshots/root2",
+      "suffix": "root2"
+    }
+  }
+}
