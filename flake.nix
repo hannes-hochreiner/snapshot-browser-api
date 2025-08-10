@@ -81,7 +81,7 @@
           configuration_file = pkgs.writeTextFile "snapshot-browser-config-api" (builtins.toJSON cfg.configuration);
         in {
           # https://britter.dev/blog/2025/01/09/nixos-modules/
-          options.hochreiner.services.snapshot-browser = {
+          options.hochreiner.services.snapshot-browser-api = {
             enable = mkEnableOption "Enables the snapshot-browser service";
 
             configuration.snapshot_roots = mkOption {
