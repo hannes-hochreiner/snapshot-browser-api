@@ -78,7 +78,10 @@
             };
           };
 
-          configuration_file = pkgs.writeTextFile "snapshot-browser-config-api" (builtins.toJSON cfg.configuration);
+          configuration_file = pkgs.writeTextFile {
+            name = "snapshot-browser-config-api";
+            text = (builtins.toJSON cfg.configuration);
+          };
         in {
           # https://britter.dev/blog/2025/01/09/nixos-modules/
           options.hochreiner.services.snapshot-browser-api = {
