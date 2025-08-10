@@ -50,7 +50,7 @@
             gcc_multi
             rust-bin-custom
           ];
-          args = [ ./builder.nu "build" ./. snapshot-browser-deps "snapshot-browser" hashes-toml.cargo_config ];
+          args = [ ./builder.nu "build" ./. snapshot-browser-deps "snapshot-browser-api" hashes-toml.cargo_config ];
       };
     in {
       packages.${system} = {
@@ -62,7 +62,7 @@
       nixosModules.${system}.default = { config, lib, pkgs, ... }:
         with lib;
         let
-          cfg = config.hochreiner.services.snapshot-browser;
+          cfg = config.hochreiner.services.snapshot-browser-api;
     
           snapshotRoot = {
             options = {
@@ -78,7 +78,7 @@
             };
           };
 
-          configuration_file = pkgs.writeTextFile "snapshot-browser-config" (builtins.toJSON cfg.configuration);
+          configuration_file = pkgs.writeTextFile "snapshot-browser-config-api" (builtins.toJSON cfg.configuration);
         in {
           # https://britter.dev/blog/2025/01/09/nixos-modules/
           options.hochreiner.services.snapshot-browser = {
@@ -110,12 +110,12 @@
           };
 
           config = mkIf cfg.enable {
-            systemd.services."hochreiner.snapshot-browser" = {
-              description = "snapshot-browser service";
+            systemd.services."hochreiner.snapshot-browser-api" = {
+              description = "snapshot-browser API service";
               serviceConfig = let pkg = self.packages.${system}.default;
               in {
                 Type = "oneshot";
-                ExecStart = "${pkg}/bin/snapshot-browser";
+                ExecStart = "${pkg}/bin/snapshot-browser-api";
                 Environment = "RUST_LOG='${cfg.log_level}' SNAPSHOT_BROWSER_CONFIG='${configuration_file}' PATH=/run/current-system/sw/bin";
               };
             };
@@ -123,7 +123,7 @@
         };
 
       devShells.${system}.default = pkgs.mkShell {
-        name = "snapshot-browser";
+        name = "snapshot-browser-api";
 
         shellHook = ''
           exec nu
