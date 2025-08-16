@@ -33,6 +33,8 @@
         builder = "${pkgs.nushell}/bin/nu";
         buildInputs = with pkgs; [
           rust-bin-custom
+          bash
+          coreutils
         ];
         args = [ ./builder.nu "vendor" ./. ];
 
@@ -78,6 +80,11 @@
             };
           };
 
+          snapshotRoots = mkOption {
+              type = types.attrsOf snapshotRoot;
+              default = {};
+          };
+
           configuration_file = pkgs.writeTextFile {
             name = "snapshot-browser-config-api";
             text = (builtins.toJSON cfg.configuration);
@@ -87,10 +94,15 @@
           options.hochreiner.services.snapshot-browser-api = {
             enable = mkEnableOption "Enables the snapshot-browser service";
 
-            configuration.snapshot_roots = mkOption {
-              type = types.attrsOf snapshotRoot;
-              default = {};
-              description = lib.mdDoc "Snapshot roots configuration";
+            configuration = mkOption {
+              type = types.submodule {
+                options = {
+                  snapshot_roots = mkOption {
+                    type = types.attrsOf (types.submodule snapshotRoot);
+                  };
+                };
+              };
+              default = { snapshot_roots = {}; };
             };
 
             log_level = mkOption {
@@ -114,12 +126,14 @@
 
           config = mkIf cfg.enable {
             systemd.services."hochreiner.snapshot-browser-api" = {
+              wantedBy = [ "multi-user.target" ];
               description = "snapshot-browser API service";
-              serviceConfig = let pkg = self.packages.${system}.default;
+              serviceConfig = let
+                pkg = self.packages.${system}.default;
               in {
-                Type = "oneshot";
+                Type = "simple";
                 ExecStart = "${pkg}/bin/snapshot-browser-api";
-                Environment = "RUST_LOG='${cfg.log_level}' SNAPSHOT_BROWSER_CONFIG='${configuration_file}' PATH=/run/current-system/sw/bin";
+                Environment = "RUST_LOG=${cfg.log_level} ROCKET_ADDRESS='${cfg.address}' ROCKET_PORT=${builtins.toString cfg.port} SNAPSHOT_CONFIG_PATH='${configuration_file}' PATH=/run/current-system/sw/bin";
               };
             };
           };
@@ -136,10 +150,59 @@
         # Extra inputs can be added here; cargo and rustc are provided by default.
         buildInputs = with pkgs; [
           rust-bin-custom
+          busybox
         ];
+      };
+
+      # NixOS configuration for testing
+      # https://xeiaso.net/blog/nix-flakes-3-2022-04-07/
+      nixosConfigurations = {
+        sb-api-test = nixpkgs.lib.nixosSystem {
+          inherit system;
+
+          modules = [
+            self.nixosModules.${system}.default
+            ({pkgs, ...}: {
+              # Only allow this to boot as a container
+              boot.isContainer = true;
+              networking.hostName = "sb-api-test";
+
+              # Allow nginx through the firewall
+              networking.firewall.allowedTCPPorts = [ 80 ];
+
+              # services.nginx.enable = true;
+              hochreiner.services.snapshot-browser-api = {
+                enable = true;
+                configuration.snapshot_roots = {
+                  "root1" = {
+                    path = "/some/path/1/";
+                    suffix = "_suffix_1";
+                  };
+                  "root2" = {
+                    path = "/some/path/2/";
+                    suffix = "_suffix_2";
+                  };
+                };
+                address = "10.233.1.2";
+                port = 80;
+              };
+
+              system.stateVersion = "25.05";
+            })
+          ];
+        };
       };
     };
   
+  # Testing
+  # https://www.tweag.io/blog/2020-07-31-nixos-flakes/
+  # https://github.com/erikarvstedt/extra-container/blob/master/examples/flake/usage.sh
+  # https://nixos.wiki/wiki/NixOS_Containers
+  # https://nixos.org/manual/nixos/stable/#ch-containers
+  # https://nix.dev/tutorials/nixos/integration-testing-using-virtual-machines.html
+  # https://github.com/tfc/nixos-integration-test-example/blob/main/flake.nix
+  # https://nixcademy.com/posts/nixos-integration-test-on-github/
+
   nixConfig = {
     substituters = [
       "https://cache.nixos.org"

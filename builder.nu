@@ -7,13 +7,23 @@ def "main vendor" [
   src: string
 ] {
   augment_path
-  print $env
-  let out = $env.out
-  let cargo_home = $"($out)/cargo_home"
+  
+  # print $env
+  # let out = $env.out
+  # let cargo_home = $"($env.out)/cargo_home"
 
   cd $src
-  mkdir $cargo_home
-  CARGO_HOME=$cargo_home cargo vendor $out -q
+  # mkdir $env.out
+  # ^mkdir -p $cargo_home
+
+  CARGO_HOME=$env.tmp cargo vendor $env.out --locked
+
+  # tree -sa $env.out
+  # if ($cargo_home | path exists) {
+    # rm -r $cargo_home
+  # }
+
+  # cd /asdsdfsd
 }
 
 def "main build" [
