@@ -12,9 +12,9 @@ export def nix-build [] {
 }
 
 export def update [] {
-	let deps_info = (get-deps-info)
-
   ^cargo update
+
+  let deps_info = (get-deps-info)
   {
     "deps": ($deps_info.hash),
 		"cargo_config": ($deps_info.cargo_config)

@@ -1,8 +1,8 @@
-deps = "sha256-YWqqvdlh/HDrNd6o/FS4V/sAmGFaJ8v7HGn6xmVjsFM="
+deps = "sha256-JDXjlpFvh1jQQrD2xt+klgweGgNKa5s3I/EtKgDU6yQ="
 cargo_config = '''
 [source.crates-io]
 replace-with = "vendored-sources"
 
 [source.vendored-sources]
-directory = "/tmp/snapshot_browser_deps_6f79d2ed-822d-4234-8ce0-75964acc7b06"'''
-cargo_lock = "0ebca4016a14298af62caac66375181beae3f2be33efa30c8e6f6d77fba09d10"
+directory = "/tmp/snapshot_browser_deps_f300431f-2463-41be-9969-b3b501ce8dd1"'''
+cargo_lock = "8a8b68fbcf4d3662ea07d50be18a781d4705a26380da6de19822bccac799eedf"
