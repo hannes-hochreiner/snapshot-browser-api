@@ -8,6 +8,8 @@ use rocket::Request;
 use rocket::State;
 use rocket::fs::NamedFile;
 use rocket::http::Status;
+use rocket::http::uri::fmt::Path;
+use rocket::request::FromSegments;
 use rocket::response;
 use rocket::response::Responder;
 use rocket::serde::json::Json;
@@ -58,6 +60,21 @@ impl<'r, 'o: 'r> Responder<'r, 'o> for SnapshotBrowserError {
 struct SystemInfo {
     name: &'static str,
     version: &'static str,
+}
+
+struct Segments {
+    segments: Vec<String>,
+}
+
+impl FromSegments<'_> for Segments {
+    type Error = SnapshotBrowserError;
+    fn from_segments(segments: rocket::http::uri::Segments<'_, Path>) -> Result<Self, Self::Error> {
+        let segments = segments
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect::<Vec<String>>();
+        Ok(Segments { segments })
+    }
 }
 
 // These environment variables are set by Cargo at build time.
@@ -159,9 +176,17 @@ fn get_latest_snapshot_path(root: &SnapshotRoot) -> Result<Option<String>, Snaps
 #[get("/roots/<name>/path/<path..>")]
 async fn paths(
     name: &str,
-    path: PathBuf,
+    path: Segments,
     config: &State<SystemConfig>,
 ) -> Result<PathResponse, SnapshotBrowserError> {
+    log::info!(
+        "Received request for path: {} in root: {}",
+        path.segments.join("/"),
+        name
+    );
+    let path_hidden = PathBuf::from(r"/home/.hidden");
+    log::info!("Using path: {}", path_hidden.display());
+
     let root = config
         .snapshot_roots
         .get(name)
@@ -172,7 +197,7 @@ async fn paths(
     let latest_snapshot_path = get_latest_snapshot_path(root)?
         .ok_or(SnapshotBrowserError::NoSnapshotsFound(name.into()))?;
 
-    let full_path = PathBuf::from(latest_snapshot_path).join(path);
+    let full_path = PathBuf::from(latest_snapshot_path).join(path.segments.join("/"));
 
     if full_path.is_file() {
         // If the path is a file, return it as a NamedFile
