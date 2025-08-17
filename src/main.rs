@@ -7,6 +7,7 @@ use log::error;
 use rocket::Request;
 use rocket::State;
 use rocket::fs::NamedFile;
+use rocket::http::ContentType;
 use rocket::http::Status;
 use rocket::http::uri::fmt::Path;
 use rocket::request::FromSegments;
@@ -22,6 +23,7 @@ use thiserror::Error;
 enum PathResponse {
     Directory(Json<Vec<FileSystemEntry>>),
     File(NamedFile),
+    Image(Vec<u8>, ContentType),
 }
 
 #[derive(Error, Debug)]
@@ -42,6 +44,10 @@ pub enum SnapshotBrowserError {
     TimestampParseError(#[from] chrono::ParseError),
     #[error("Filter error: {0}")]
     FilterError(String),
+    #[error("Image error: {0}")]
+    ImageError(#[from] image::ImageError),
+    #[error("IntoInner error: {0}")]
+    IntoInnerError(#[from] std::io::IntoInnerError<std::io::BufWriter<std::io::Cursor<Vec<u8>>>>),
 }
 
 impl<'r, 'o: 'r> Responder<'r, 'o> for SnapshotBrowserError {
@@ -176,12 +182,14 @@ fn get_latest_snapshot_path(root: &SnapshotRoot) -> Result<Option<String>, Snaps
     }
 }
 
-#[get("/roots/<name>/path/<path..>?<hidden>")]
+#[get("/roots/<name>/path/<path..>?<hidden>&<width>&<height>")]
 async fn paths(
     name: &str,
     path: Segments,
     config: &State<SystemConfig>,
     hidden: Option<bool>,
+    width: Option<u32>,
+    height: Option<u32>,
 ) -> Result<PathResponse, SnapshotBrowserError> {
     log::debug!("Received request for path: {:?} in root: {}", path, name);
 
@@ -208,17 +216,59 @@ async fn paths(
         .ok_or(SnapshotBrowserError::NoSnapshotsFound(name.into()))?;
 
     let full_path = PathBuf::from(latest_snapshot_path).join(path.segments.join("/"));
+    // let can_scale = path
+    //     .segments
+    //     .last()
+    //     .and_then(|last_segment| {
+    //         match [".png", ".jpg", ".jpeg", ".gif", ".tiff", ".webp", ".hdr"]
+    //             .iter()
+    //             .any(|ext| last_segment.to_lowercase().ends_with(ext))
+    //         {
+    //             true => Some(()),
+    //             false => None,
+    //         }
+    //     })
+    //     .is_some();
 
     if full_path.is_file() {
+        // Check if image resizing is requested
+        match generate_image_response(&full_path, width, height) {
+            Some(response) => response,
+            None => Ok(PathResponse::File(
+                NamedFile::open(&full_path)
+                    .await
+                    .map_err(|e| SnapshotBrowserError::IoError {
+                        message: format!("Failed to open file: {}", &full_path.to_string_lossy()),
+                        source: e,
+                    })?,
+            )),
+        }
+        // if width.is_some() || height.is_some() {
+        //     log::debug!(
+        //         "Resizing of image at path: {} with width: {:?} and height: {:?} requested",
+        //         full_path.display(),
+        //         width,
+        //         height
+        //     );
+        //     let img = image::open(full_path)?;
+        //     let resized_img =
+        //         img.thumbnail(width.unwrap_or(img.width()), height.unwrap_or(img.height()));
+        //     let mut buffer_writer = std::io::BufWriter::new(std::io::Cursor::new(Vec::new()));
+        //     resized_img.write_to(&mut buffer_writer, image::ImageFormat::Jpeg)?;
+        //     return Ok(PathResponse::Image(
+        //         buffer_writer.into_inner()?.into_inner().to_vec(),
+        //         ContentType::JPEG,
+        //     ));
+        // }
         // If the path is a file, return it as a NamedFile
-        Ok(PathResponse::File(
-            NamedFile::open(&full_path)
-                .await
-                .map_err(|e| SnapshotBrowserError::IoError {
-                    message: format!("Failed to open file: {}", &full_path.to_string_lossy()),
-                    source: e,
-                })?,
-        ))
+        // Ok(PathResponse::File(
+        //     NamedFile::open(&full_path)
+        //         .await
+        //         .map_err(|e| SnapshotBrowserError::IoError {
+        //             message: format!("Failed to open file: {}", &full_path.to_string_lossy()),
+        //             source: e,
+        //         })?,
+        // ))
     } else if full_path.is_dir() {
         match fs::read_dir(&full_path) {
             Ok(entries_iter) => {
@@ -277,6 +327,55 @@ async fn paths(
             full_path.display()
         )))
     }
+}
+
+fn generate_image_response(
+    full_path: &PathBuf,
+    width: Option<u32>,
+    height: Option<u32>,
+) -> Option<Result<PathResponse, SnapshotBrowserError>> {
+    log::debug!(
+        "Resizing of image at path: {} with width: {:?} and height: {:?} requested",
+        full_path.display(),
+        width,
+        height
+    );
+
+    if width.is_none() && height.is_none() {
+        log::debug!(
+            "No resizing parameters provided for image at path: {}. Hence, no resizing will be done.",
+            full_path.display()
+        );
+        return None;
+    }
+
+    full_path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .and_then(|ext| match ext {
+            "png" => Some(image::ImageFormat::Png),
+            "jpg" | "jpeg" => Some(image::ImageFormat::Jpeg),
+            "gif" => Some(image::ImageFormat::Gif),
+            "tiff" => Some(image::ImageFormat::Tiff),
+            "webp" => Some(image::ImageFormat::WebP),
+            "hdr" => Some(image::ImageFormat::Hdr),
+            _ => None,
+        })
+        .map(|format| {
+            let mut buffer_writer = std::io::BufWriter::new(std::io::Cursor::new(Vec::new()));
+            let img = image::open(full_path)?;
+
+            img.thumbnail(width.unwrap_or(img.width()), height.unwrap_or(img.height()))
+                .write_to(&mut buffer_writer, format)?;
+            Ok(PathResponse::Image(
+                buffer_writer.into_inner()?.into_inner().to_vec(),
+                full_path
+                    .extension()
+                    .and_then(|ext| ext.to_str())
+                    .and_then(|ext| ContentType::from_extension(ext))
+                    .unwrap_or(ContentType::Binary),
+            ))
+        })
 }
 
 #[rocket::main]

@@ -44,3 +44,7 @@ The system must use the Rocket framework.
 This work is licensed under the MIT or Apache 2.0 license.
 
 `SPDX-License-Identifier: MIT OR Apache-2.0`
+
+The image in the test_data directory was obtained from the [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Tabby_cat_with_blue_eyes-3336579.jpg).
+The author is [AdinaVoicu](https://pixabay.com/en/users/AdinaVoicu-485024/).
+The image was made available under the [Creative Commons CC0 1.0 Universal Public Domain Dedication](https://creativecommons.org/publicdomain/zero/1.0/deed.en).

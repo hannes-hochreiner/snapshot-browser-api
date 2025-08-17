@@ -14,3 +14,11 @@ thiserror = "2.0.12"
 log = "0.4"
 env_logger = "0.11.8"
 chrono = "0.4.41"
+image = { version = "0.25.6", default-features = false, features = [
+  "gif",
+  "hdr",
+  "jpeg",
+  "png",
+  "tiff",
+  "webp",
+] }
