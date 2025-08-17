@@ -4,5 +4,5 @@ cargo_config = '''
 replace-with = "vendored-sources"
 
 [source.vendored-sources]
-directory = "/tmp/snapshot_browser_deps_dbb3674f-8553-45c7-96bf-128a00fa4a31"'''
-cargo_lock = "253cb99b8c6b129f10cf22b5877f24e28d91c9fe30fd17f0882c33ce9ebf4a09"
+directory = "/tmp/snapshot_browser_deps_0404c1cc-311f-481c-be23-bc3814e24de1"'''
+cargo_lock = "eff814ae7070a56f0e45e1e0236db79c1bab929028c5f7dc4d8394139bac5bf0"
