@@ -40,6 +40,8 @@ pub enum SnapshotBrowserError {
     ConfigParseError(#[from] serde_json::Error),
     #[error("Failed to parse timestamp: {0}")]
     TimestampParseError(#[from] chrono::ParseError),
+    #[error("Filter error: {0}")]
+    FilterError(String),
 }
 
 impl<'r, 'o: 'r> Responder<'r, 'o> for SnapshotBrowserError {
@@ -62,6 +64,7 @@ struct SystemInfo {
     version: &'static str,
 }
 
+#[derive(Debug)]
 struct Segments {
     segments: Vec<String>,
 }
@@ -173,19 +176,26 @@ fn get_latest_snapshot_path(root: &SnapshotRoot) -> Result<Option<String>, Snaps
     }
 }
 
-#[get("/roots/<name>/path/<path..>")]
+#[get("/roots/<name>/path/<path..>?<hidden>")]
 async fn paths(
     name: &str,
     path: Segments,
     config: &State<SystemConfig>,
+    hidden: Option<bool>,
 ) -> Result<PathResponse, SnapshotBrowserError> {
-    log::info!(
-        "Received request for path: {} in root: {}",
-        path.segments.join("/"),
-        name
-    );
-    let path_hidden = PathBuf::from(r"/home/.hidden");
-    log::info!("Using path: {}", path_hidden.display());
+    log::debug!("Received request for path: {:?} in root: {}", path, name);
+
+    let hidden = hidden.unwrap_or(false);
+
+    if let Some(segment) = path.segments.last() {
+        if segment.starts_with('.') && !hidden {
+            return Err(SnapshotBrowserError::FilterError(format!(
+                "The requested path cannot be displayed due to filter settings: hidden = {}, path: {}",
+                hidden,
+                path.segments.join("/")
+            )));
+        }
+    }
 
     let root = config
         .snapshot_roots
