@@ -60,3 +60,7 @@ export def destroy-test-container [] {
   
   sudo nixos-container destroy sb-api-test
 }
+
+export def start [] {
+  RUST_LOG=debug SNAPSHOT_CONFIG_PATH=./test_config.json ROCKET_ADDRESS=127.0.0.1 ROCKET_PORT=8080 ^cargo run
+}
