@@ -216,19 +216,6 @@ async fn paths(
         .ok_or(SnapshotBrowserError::NoSnapshotsFound(name.into()))?;
 
     let full_path = PathBuf::from(latest_snapshot_path).join(path.segments.join("/"));
-    // let can_scale = path
-    //     .segments
-    //     .last()
-    //     .and_then(|last_segment| {
-    //         match [".png", ".jpg", ".jpeg", ".gif", ".tiff", ".webp", ".hdr"]
-    //             .iter()
-    //             .any(|ext| last_segment.to_lowercase().ends_with(ext))
-    //         {
-    //             true => Some(()),
-    //             false => None,
-    //         }
-    //     })
-    //     .is_some();
 
     if full_path.is_file() {
         // Check if image resizing is requested
@@ -243,32 +230,6 @@ async fn paths(
                     })?,
             )),
         }
-        // if width.is_some() || height.is_some() {
-        //     log::debug!(
-        //         "Resizing of image at path: {} with width: {:?} and height: {:?} requested",
-        //         full_path.display(),
-        //         width,
-        //         height
-        //     );
-        //     let img = image::open(full_path)?;
-        //     let resized_img =
-        //         img.thumbnail(width.unwrap_or(img.width()), height.unwrap_or(img.height()));
-        //     let mut buffer_writer = std::io::BufWriter::new(std::io::Cursor::new(Vec::new()));
-        //     resized_img.write_to(&mut buffer_writer, image::ImageFormat::Jpeg)?;
-        //     return Ok(PathResponse::Image(
-        //         buffer_writer.into_inner()?.into_inner().to_vec(),
-        //         ContentType::JPEG,
-        //     ));
-        // }
-        // If the path is a file, return it as a NamedFile
-        // Ok(PathResponse::File(
-        //     NamedFile::open(&full_path)
-        //         .await
-        //         .map_err(|e| SnapshotBrowserError::IoError {
-        //             message: format!("Failed to open file: {}", &full_path.to_string_lossy()),
-        //             source: e,
-        //         })?,
-        // ))
     } else if full_path.is_dir() {
         match fs::read_dir(&full_path) {
             Ok(entries_iter) => {
@@ -292,6 +253,12 @@ async fn paths(
                         ))
                     })?;
 
+                    // Skip hidden files if the hidden parameter is false
+                    if !hidden && name.starts_with('.') {
+                        continue;
+                    }
+
+                    // Add the entry to the list based on its type
                     if file_type.is_dir() {
                         entries.push(FileSystemEntry {
                             name,
